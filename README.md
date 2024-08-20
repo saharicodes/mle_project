@@ -128,6 +128,46 @@ docker-compose down
 
 ## Further Discussion
 
+### CI/CD Pipeline Proposal
+This proposal outlines the steps and tools required to implement a CI/CD pipeline for automating the deployment of the airflow ML pipline into production. The pipeline will handle code integration, testing, Docker image building, pushing to Azure ACR, and deployment to either a VM or a Kubernetes cluster.
+
+Tools and Technologies
+Version Control System: Git (GitHub, GitLab, or Bitbucket)
+CI/CD Pipeline: Jenkins
+Containerization: Docker
+Container Registry: Azure Container Registry (ACR)
+Deployment: Docker Compose (for VM) 
+Testing and Linting: PyTest and Flake8
+
+#### CI/CD Pipeline Stages
+1. Continuous Integration (CI)
+- The CI pipeline begins by checking out the latest code from the repository when changes are pushed or a pull request is created.
+- Static Code Analysis and Linting using Flake8 to enforce coding standards.
+- Run unit tests using PyTest to ensure code is not broken.
+2. Building and Pushing Docker Image
+- Conteinerize application using Docker
+- After building, tag the Docker image and push it to ACR or any other registery for storage and later use in deployment.
+3. Continuous Deployment (CD)
+- Deploy the image to a `development` environment for further monitoring.
+- Manually triger production deploy job to deploy the application to `production` environment, eg. on a VM using Docker Compose or on a Kubernetes cluster using Helm charts.
+
+#### Live Performance Monitoring:
+
+##### Metrics:
+
+1. Prediction Accuracy: Compare model predictions against the ground truth to measure accuracy.
+2. Latency: Track the time it takes for the model to generate predictions.
+3. Observe changes in statistical properties of incoming data compared to training data. (Data Drift)
+4. Monitor model's performance over time to detect any gradual degradation. (Model Drift)
+
+##### Monitoring strategy:
+
+- Store live predictions in a database (e.g., PostgreSQL, MongoDB) for performance monitoring against ground truth.
+- Use Grafana to pull prediction data from the database and visualize performance metrics.
+- Set up alert rules in Grafana based on business requirements (e.g., accuracy drops, latency increases).
+- Scheduled or automated regular model retraining on new data to maintain accuracy.
+- Use Canary deploymentstrategy to gradually roll out the new model version to a small subset of users, monitor its performance, and if no issues are detected, progressively increase the deployment to the entire user base.
+
 ## Next Steps
 
 ### 1. Unit Testing: 
