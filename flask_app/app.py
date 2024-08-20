@@ -1,12 +1,12 @@
 import os
 import logging
+import time
 import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from datetime import datetime
 
 AIRFLOW_ENDPOINT_URL = "http://airflow-webserver:8080/api/v1"
-
 airflow_api_params = {
     'headers': {
         'Content-type': 'application/json',
@@ -17,6 +17,15 @@ airflow_api_params = {
         os.getenv('_AIRFLOW_WWW_USER_PASSWORD', 'airflow')
     )
 }
+
+def get_xcom_value(dag_id, dag_run_id, task_id, key='predictions'):
+    """Fetch the XCom value for a given DAG run and task."""
+    xcom_url = f"{AIRFLOW_ENDPOINT_URL}/dags/{dag_id}/dagRuns/{dag_run_id}/taskInstances/{task_id}/xcomEntries/{key}"
+    response = requests.get(xcom_url, **airflow_api_params)
+    if response.status_code == 200:
+        return response.json().get('value')
+    else:
+        return None
 
 def response_fail(msg, code=500):
     """
@@ -90,9 +99,28 @@ def create_app():
             )
 
             if response.status_code == 200:
-                return jsonify({"message": "Inference DAG triggered successfully!", "dag_run_id": response.json().get('dag_run_id')})
+                dag_run_id = response.json().get('dag_run_id')
+
+                for _ in range(10):  
+                    dag_status_url = f"{AIRFLOW_ENDPOINT_URL}/dags/{dag_id}/dagRuns/{dag_run_id}"
+                    status_response = requests.get(dag_status_url, **airflow_api_params)
+                    if status_response.status_code == 200:
+                        dag_run = status_response.json()
+                        if dag_run['state'] == 'success':
+                            prediction = get_xcom_value(dag_id, dag_run_id, task_id='make_inference')
+                            if prediction:
+                                return jsonify({"status": "success", "prediction": prediction})
+                            else:
+                                return jsonify({"status": "failed", "message": "Prediction XCom value not found"}), 500
+                        elif dag_run['state'] in ['failed', 'up_for_retry', 'up_for_reschedule']:
+                            return jsonify({"status": "failed", "message": f"DAG run {dag_run['state']}"}), 500
+
+                    time.sleep(5)
+
+                return jsonify({"status": "failed", "message": "Prediction not ready"}), 202 
             else:
                 return response_fail("Failed to trigger Inference DAG", code=response.status_code)
+
         except Exception as e:
             return fail_from_error('Unable to trigger Inference DAG!')
 
