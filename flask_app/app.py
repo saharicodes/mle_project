@@ -1,8 +1,9 @@
 import os
 import logging
 import requests
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
+from datetime import datetime
 
 AIRFLOW_ENDPOINT_URL = "http://airflow-webserver:8080/api/v1"
 
@@ -70,6 +71,30 @@ def create_app():
             return fail_from_error('Unable to trigger DAG!')
         
         return jsonify({"status": "success", "dag_run_id": resp.json().get('dag_run_id')})
+
+
+    @app.route('/trigger_inference/<dag_id>', methods=['POST'])
+    def trigger_inference_dag(dag_id):
+        input_data = request.json
+        payload = {
+            "conf": {
+                "input_data": input_data
+            }
+        }
+
+        try:
+            response = requests.post(
+                f"{AIRFLOW_ENDPOINT_URL}/dags/{dag_id}/dagRuns",
+                json=payload,
+                **airflow_api_params
+            )
+
+            if response.status_code == 200:
+                return jsonify({"message": "Inference DAG triggered successfully!", "dag_run_id": response.json().get('dag_run_id')})
+            else:
+                return response_fail("Failed to trigger Inference DAG", code=response.status_code)
+        except Exception as e:
+            return fail_from_error('Unable to trigger Inference DAG!')
 
     return app
 

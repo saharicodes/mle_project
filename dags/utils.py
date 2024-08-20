@@ -128,8 +128,9 @@ def get_evaluate():
 
 
 def preprocess_inference_data(**kwargs):
-    df = pd.read_csv("./data/german_credit_data.csv", index_col=0).head(2)
-    df = df.drop(columns=['Risk'])
+
+    input_data = kwargs['dag_run'].conf.get('input_data')
+    df = pd.DataFrame(input_data)
 
     numerical_cols = ['Age', 'Credit amount', 'Duration']
     categorical_cols = ["Sex", "Job", "Housing", "Purpose"]
