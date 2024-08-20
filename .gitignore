@@ -30,7 +30,6 @@ coverage/
 *.log
 *.out
 *.cache
-*.pkl
 *.lock
 
 # MyPy

@@ -36,7 +36,7 @@ def get_outliers(df, feature, iqr_threshold=1.5):
 
 def preprocess_data():
 
-    df = pd.read_csv("./data/german_credit_data.csv")
+    df = pd.read_csv("./data/german_credit_data.csv", index_col=0)
     # handle missing
     numerical_cols = ['Age', 'Credit amount', 'Duration']
     categorical_cols = ["Sex", "Job", "Housing", "Purpose", "Risk"]
@@ -61,15 +61,19 @@ def get_training_features():
     df["Duration_gt_median"] = df["Duration"].map(lambda x: (x >= df["Duration"].median()).astype(int))
     df["Credit_amount_gt_median"] = df["Credit amount"].map(lambda x: (x >= df["Credit amount"].median()).astype(int))
 
-    label_encoder = LabelEncoder()
-    label_encode_features = ["Sex", "Job", "Housing", "Saving accounts", "Checking account", "Purpose"]
+    category_mapping = {
+    'Sex': {'male': 1, 'female': 0},
+    'Housing': {'own': 0, 'rent': 1, 'free': 2},
+    'Saving accounts': {'little': 0, 'moderate': 1 , 'quite rich': 2, 'rich': 3, 'none': 4},
+    'Checking account': {'little': 0, 'moderate': 1 , 'rich': 2, 'none': 3},
+    'Purpose': {'radio/TV': 0, 'education': 1 , 'furniture/equipment': 2, 'car': 3, 'business': 4, 'domestic appliances': 5, 'repairs': 6, 'vacation/others': 7},
+    }
 
-    for feature in label_encode_features:
-        df[feature] = label_encoder.fit_transform(df[feature])
+    for col, mapping in category_mapping.items():
+        df[col] = df[col].map(mapping)
 
     df['Risk'] = df['Risk'].map({'bad': 1, 'good': 0})
     df.to_csv('train_feat_df.csv', index=False)
-
 
 def get_train_test_split():
 
@@ -113,7 +117,6 @@ def get_evaluate():
     model_name = 'classifier_model'
     model_version_alias = 'challenger'
     model_uri = f"models:/{model_name}@{model_version_alias}"
-    print('model uri', model_uri)
     logistic_reg_model = mlflow.pyfunc.load_model(model_uri=model_uri)
 
 
@@ -122,3 +125,51 @@ def get_evaluate():
     y_pred = logistic_reg_model.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
     print('accuracy is: ', acc)
+
+
+def preprocess_inference_data(**kwargs):
+    df = pd.read_csv("./data/german_credit_data.csv", index_col=0).head(2)
+    df = df.drop(columns=['Risk'])
+
+    numerical_cols = ['Age', 'Credit amount', 'Duration']
+    categorical_cols = ["Sex", "Job", "Housing", "Purpose"]
+
+    df = handle_missing_values(df, numerical_cols, categorical_cols)
+
+    kwargs['ti'].xcom_push(key='preprocessed_data', value=df.to_dict())
+
+def feature_engineer_inference(**kwargs):
+
+    preprocessed_data = kwargs['ti'].xcom_pull(key='preprocessed_data', task_ids='preprocess_data')
+    df = pd.DataFrame(preprocessed_data)
+
+    df["Age_gt_median"] = df["Age"].map(lambda x: (x >= df["Age"].median()).astype(int))
+    df["Duration_gt_median"] = df["Duration"].map(lambda x: (x >= df["Duration"].median()).astype(int))
+    df["Credit_amount_gt_median"] = df["Credit amount"].map(lambda x: (x >= df["Credit amount"].median()).astype(int))
+    
+    category_mapping = {
+    'Sex': {'male': 1, 'female': 0},
+    'Housing': {'own': 0, 'rent': 1, 'free': 2},
+    'Saving accounts': {'little': 0, 'moderate': 1 , 'quite rich': 2, 'rich': 3, 'none': 4},
+    'Checking account': {'little': 0, 'moderate': 1 , 'rich': 2, 'none': 3},
+    'Purpose': {'radio/TV': 0, 'education': 1 , 'furniture/equipment': 2, 'car': 3, 'business': 4, 'domestic appliances': 5, 'repairs': 6, 'vacation/others': 7},
+    }
+    for col, mapping in category_mapping.items():
+        df[col] = df[col].map(mapping)  
+
+    kwargs['ti'].xcom_push(key='feature_engineered_data', value=df.to_dict())
+
+def make_inference(**kwargs):
+
+    feature_engineered_data = kwargs['ti'].xcom_pull(key='feature_engineered_data', task_ids='feature_engineering')
+    df = pd.DataFrame(feature_engineered_data)
+
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+    model_name = 'classifier_model'
+    model_version_alias = 'challenger'
+    model_uri = f"models:/{model_name}@{model_version_alias}"
+
+    classifier_model = mlflow.pyfunc.load_model(model_uri=model_uri)
+    y_pred = classifier_model.predict(df)
+    kwargs['ti'].xcom_push(key='predictions', value=y_pred.tolist())
