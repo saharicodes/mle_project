@@ -1,0 +1,11 @@
+FROM python:3.11.9-slim
+
+WORKDIR /app
+
+COPY flask_app/ /app/
+
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+EXPOSE 5001
+
+CMD ["python", "app.py"]
