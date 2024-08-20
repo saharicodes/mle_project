@@ -42,6 +42,86 @@ This project integrates Apache Airflow with a Flask API to manage both the train
 
 ## Installation and Setup
 
-1. **Clone the Repository**:
+1. Clone the Repository:
 
    ```bash
+   git clone https://github.com/saharicodes/mle_project.git
+   cd mle_project
+   ```
+2. Create `.env` file and run 
+   ```bash
+   echo -e "AIRFLOW_UID=$(id -u)" > .env
+   ```
+2. Run the following command to initialize the Airflow metadata database:
+
+   ```bash
+    docker-compose up airflow-init
+   ```
+
+3. Build the Docker images and start the containers
+   ```bash
+    docker-compose up --build
+   ```
+
+This command will start the following services:
+
+* Airflow Webserver: Accessible at http://localhost:8080
+* Airflow Scheduler
+* Airflow Worker
+* Airflow Triggerer
+* Airflow redis #cache
+* Airflow postgres #backend store
+* MLflow Server: Accessible at http://localhost:5000
+* Flask API: Accessible at http://localhost:5001
+
+## Usage
+
+### Triggering DAGs
+
+#### Trigger Inference DAG via Flask API
+
+Use a tool like Postman, curl, or any HTTP client to send a POST request with the input data to trigger the inference DAG.
+
+```bash
+curl -X POST http://localhost:5001/trigger_inference/ml_pipeline_inference \
+-H "Content-Type: application/json" \
+-d '{"Age": [67],
+ "Sex": ["male"],
+ "Job": [2],
+ "Housing": ["own"],
+ "Saving accounts": [null],
+ "Checking account": ["little"],
+ "Credit amount": [1169],
+ "Duration": [6],
+ "Purpose": ["radio/TV"]}'
+```
+Sample output format 
+```bash
+{
+    "prediction": "[0]",
+    "status": "success"
+}
+```
+You can also use Postman client running on a host machine to trigger API endpoints
+
+#### Trigger Training DAG via Flask API
+The training DAG can be triggered similarly:
+
+```bash
+curl -X POST http://localhost:5001/trigger/ml_pipeline_training \
+-H "Content-Type: application/json"
+```
+
+**Note**: You can also use Postman client running on a host machine to trigger API endpoints. 
+
+### Access Airflow and Mlflow Web UI
+Access the Airflow web interface at http://localhost:8080 to manually trigger DAGs or monitor their status.
+
+You can also access the Mlflow web interface at http://localhost:5000 to view experiments and registered models and add model ailias for the well performing model to be used for inference.
+
+### Stopping the Services
+To stop all running services, use:
+
+``` bash
+docker-compose down
+```
