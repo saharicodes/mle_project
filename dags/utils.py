@@ -14,7 +14,6 @@ import mlflow.sklearn
 
 MLFLOW_TRACKING_URI = "http://mlflow-server:5000"  
 MLFLOW_EXPERIMENT_NAME = "ml_pipeline_demo"
-PREDICTION_DIR = "/opt/airflow/predictions"
 
 def handle_missing_values(df: pd.DataFrame, numerical_cols: list, categorical_cols: list) -> pd.DataFrame: 
     for col in ['Saving accounts', 'Checking account']:
@@ -175,15 +174,5 @@ def make_inference(**kwargs):
 
     classifier_model = mlflow.pyfunc.load_model(model_uri=model_uri)
     y_pred = classifier_model.predict(df)
-
-    run_id = kwargs['run_id']
-    print(run_id)
-    print(y_pred.tolist())
-    output_file = os.path.join(PREDICTION_DIR, f"prediction_{run_id}.json")
-
-    os.makedirs(PREDICTION_DIR, exist_ok=True)
-
-    with open(output_file, 'w') as f:
-        json.dump(y_pred.tolist(), f)
 
     kwargs['ti'].xcom_push(key='predictions', value=y_pred.tolist())
