@@ -1,8 +1,4 @@
-# from airflow.models import DAG
-# from datetime import datetime
-# from airflow.operators.python import PythonOperator
 import pandas as pd 
-# import os
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score
@@ -109,13 +105,8 @@ def train_classifier():
         classifier.fit(X_train, y_train)
         mlflow.sklearn.log_model(classifier, artifact_path="model", registered_model_name="classifier_model")
 
-    with open('model.pkl', 'wb') as f:
-        pickle.dump(classifier, f)
-
 
 def get_evaluate():
-    # with open('model.pkl', 'rb') as f:
-    #     logistic_reg_model = pickle.load(f)
     
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
@@ -123,7 +114,6 @@ def get_evaluate():
     model_version_alias = 'challenger'
     model_uri = f"models:/{model_name}@{model_version_alias}"
     print('model uri', model_uri)
-    # logistic_reg_model = mlflow.sklearn.load_model(model_uri=model_uri)
     logistic_reg_model = mlflow.pyfunc.load_model(model_uri=model_uri)
 
 
